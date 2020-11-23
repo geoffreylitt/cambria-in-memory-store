@@ -1,10 +1,10 @@
 // ======================================
-// This file shows how Cloudina can be used to implement CambriaLocalStorage
+// This file shows how Cloudina can be used to implement CambriaStore
 // ======================================
 
 import assert from 'assert'
 import { addProperty, renameProperty, convertValue, LensSource } from 'cambria'
-import { CambriaLocalStorage, RawDoc } from '../src/data-conversion'
+import { CambriaStore, RawDoc } from '../src/storage'
 
 export interface ProjectV1 {
   title: string
@@ -53,28 +53,47 @@ const v2ToV3LensSource: LensSource = [
   ),
 ]
 
-
-
-describe('CambriaLocalStorage', () => {
-  const chitin = new CambriaLocalStorage()
-  chitin.initializeSchema('Project')
-  const projectV1Schema = chitin.upgradeSchema(projectV1Lens, 'Project')
-  const projectV2Schema = chitin.upgradeSchema(v1Tov2LensSource, 'Project')
-  const projectV3Schema = chitin.upgradeSchema(v2ToV3LensSource, 'Project')
+describe('CambriaStore', () => {
+  const store = new CambriaStore()
+  store.initializeSchema('Project')
+  const projectV1Schema = store.upgradeSchema(projectV1Lens, 'Project')
+  const projectV2Schema = store.upgradeSchema(v1Tov2LensSource, 'Project')
+  const projectV3Schema = store.upgradeSchema(v2ToV3LensSource, 'Project')
 
   // initialize a v1 doc
-  const rawDoc: RawDoc = chitin.initDoc({ title: 'hello', summary: 'this works' }, projectV1Schema)
+  const rawDoc: RawDoc = store.initDoc({ title: 'hello', summary: 'this works' }, projectV1Schema)
 
-  // write a change in v2 schema
-  chitin.changeTypedDoc(rawDoc, projectV2Schema, (v2doc) => {
-    v2doc.description = 'a great project'
-  })
-
+  // Our writers all mutate the underlying doc,
+  // so we need to create new copies per test to keep them isolated
   const newDoc = () => JSON.parse(JSON.stringify(rawDoc))
 
+  describe('basic reads', () => {
+    const rawDoc = newDoc()
+
+    it('can read the v1 doc as a v2 doc', () => {
+      assert.deepStrictEqual(store.readAs(rawDoc, projectV2Schema), {
+        title: 'hello',
+        description: 'this works',
+      })
+    })
+  
+    it('can read the v1 doc as a v1 doc', () => {
+      assert.deepStrictEqual(store.readAs(rawDoc, projectV1Schema), {
+        title: 'hello',
+        summary: 'this works',
+      })
+    })
+  })
+
   describe('readAs', () => {
+    const rawDoc = newDoc()
+    // write a change in the v2 schema
+    store.changeTypedDoc(rawDoc, projectV2Schema, (v2doc) => {
+      v2doc.description = 'a great project'
+    })
+
     it('reads the v2 change from v1', () => {
-      assert.deepStrictEqual(chitin.readAs(rawDoc, projectV1Schema), {
+      assert.deepStrictEqual(store.readAs(rawDoc, projectV1Schema), {
         title: 'hello',
         summary: 'a great project',
       })
@@ -83,35 +102,35 @@ describe('CambriaLocalStorage', () => {
 
   describe('basic write', () => {
     const rawDoc = newDoc()
-    chitin.changeTypedDoc(rawDoc, projectV1Schema, (v1doc) => {
+    store.changeTypedDoc(rawDoc, projectV1Schema, (v1doc) => {
       v1doc.summary = "it's working"
     })
 
     it('writes to the the writer schema itself', () => {
-      assert.strictEqual(chitin.readAs(rawDoc, projectV1Schema).summary, "it's working")
+      assert.strictEqual(store.readAs(rawDoc, projectV1Schema).summary, "it's working")
     })
 
     it('writes to other schemas one conversion away', () => {
-      assert.strictEqual(chitin.readAs(rawDoc, projectV2Schema).description, "it's working")
+      assert.strictEqual(store.readAs(rawDoc, projectV2Schema).description, "it's working")
     })
 
     it('writes to other schemas multiple conversions away', () => {
-      assert.strictEqual(chitin.readAs(rawDoc, projectV3Schema).description, "it's working")
+      assert.strictEqual(store.readAs(rawDoc, projectV3Schema).description, "it's working")
     })
   })
 
   describe('boolean to enum conversion', () => {
     const rawDoc = newDoc()
-    chitin.changeTypedDoc(rawDoc, projectV2Schema, (v2doc) => {
+    store.changeTypedDoc(rawDoc, projectV2Schema, (v2doc) => {
       v2doc.complete = true
     })
 
     it('writes to the the writer schema itself', () => {
-      assert.strictEqual(chitin.readAs(rawDoc, projectV2Schema).complete, true)
+      assert.strictEqual(store.readAs(rawDoc, projectV2Schema).complete, true)
     })
 
     it('writes to other schemas one conversion away', () => {
-      assert.strictEqual(chitin.readAs(rawDoc, projectV3Schema).status, 'done')
+      assert.strictEqual(store.readAs(rawDoc, projectV3Schema).status, 'done')
     })
   })
 
@@ -119,8 +138,8 @@ describe('CambriaLocalStorage', () => {
     it('can merge together data from divergent branches with an extra connecting lens', () => {
       const rawDoc = newDoc()
 
-      const branch1 = new CambriaLocalStorage()
-      const branch2 = new CambriaLocalStorage()
+      const branch1 = new CambriaStore()
+      const branch2 = new CambriaStore()
 
       // Each branch adds a new property and writes to the new property
       branch1.initializeSchema('Project')
@@ -204,7 +223,7 @@ describe('CambriaLocalStorage', () => {
       // We call a relatively low level method "addLensToGraph" here;
       // This bypasses all the schemaName + linear schema management logic, and simply
       // adds a lens between two existing schemas that can be used for conversions.
-      // Todo: formalize this API more, clarify the external API surface of CambriaLocalStorage
+      // Todo: formalize this API more, clarify the external API surface of CambriaStore
       branch1.connectExistingSchemas([], branch2Schema, combinedSchema)
 
       // Now let's try another read:
@@ -218,10 +237,10 @@ describe('CambriaLocalStorage', () => {
     it('reads from an array that it wrote to', () => {
       const addTagsLens: LensSource = [addProperty({ name: 'tags', type: 'array' })]
 
-      const chitin = new CambriaLocalStorage()
-      chitin.initializeSchema('Project')
-      chitin.upgradeSchema(projectV1Lens, 'Project')
-      const finalSchemaId = chitin.upgradeSchema(addTagsLens, 'Project')
+      const store = new CambriaStore()
+      store.initializeSchema('Project')
+      store.upgradeSchema(projectV1Lens, 'Project')
+      const finalSchemaId = store.upgradeSchema(addTagsLens, 'Project')
 
       const initialDoc = {
         title: 'hello',
@@ -229,14 +248,14 @@ describe('CambriaLocalStorage', () => {
         tags: [],
       }
 
-      const doc = chitin.initDoc(initialDoc, finalSchemaId)
+      const doc = store.initDoc(initialDoc, finalSchemaId)
 
-      chitin.changeTypedDoc(doc, finalSchemaId, (typedDoc) => {
+      store.changeTypedDoc(doc, finalSchemaId, (typedDoc) => {
         typedDoc.tags.push('a tag')
         typedDoc.tags.push('another tag')
       })
 
-      assert.deepStrictEqual(chitin.readAs(doc, finalSchemaId), {
+      assert.deepStrictEqual(store.readAs(doc, finalSchemaId), {
         ...initialDoc,
         tags: ['a tag', 'another tag'],
       })

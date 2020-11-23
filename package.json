@@ -1,13 +1,15 @@
 {
-  "name": "cambria-localstorage",
-  "version": "1.0.0",
-  "description": "An integration of Cambria with browser local storage",
+  "name": "cambria-in-memory-store",
+  "version": "0.1",
+  "description": "A wrapper for using cambria to store multi-schema docs in memory",
   "main": "index.js",
   "author": "Geoffrey Litt",
   "license": "MIT",
   "dependencies": {
-    "ajv": "^6.12.6",
     "cambria": "^0.1.2"
+  },
+  "scripts": {
+    "test": "mocha -r ts-node/register test/**.ts"
   },
   "devDependencies": {
     "@types/jest": "^26.0.15",

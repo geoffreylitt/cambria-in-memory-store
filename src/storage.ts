@@ -17,7 +17,7 @@ export interface RawDoc {
   patches: TypedPatch[]
 }
 
-export class CambriaLocalStorage {
+export class CambriaStore {
   headSchemas: { [key:string]: string }
   graph: LensGraph
 
