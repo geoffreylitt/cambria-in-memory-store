@@ -2,9 +2,14 @@
 
 A tiny library that integrates with [cambria](https://github.com/inkandswitch/cambria) to help you store documents in memory which can be read/written using multiple schemas.
 
-Cambria does all the heavy lifting, provides stateless utilities for manipulating documents, patches, schemas, and lenses. But it's intentionally unopinionated about where you store any of this information. This library simply saves the graph of lenses and schemas on an in-memory object. 
+`cambria` does all the heavy lifting, provides stateless utilities for manipulating documents, patches, schemas, and lenses. But `cambria` is intentionally unopinionated about where you store any of this information. `cambria-in-memory-store` simply saves the graph of lenses and schemas on an in-memory object. 
 
-Cambria is also unopinionated about the IDs associated with schemas. cambria-in-memory-store helps generate random schema IDs and maintain a mapping from readable names to specific schemas (just like git associates branch names with commits).
+`cambria` is also unopinionated about the IDs associated with schemas. `cambria-in-memory-store` helps generate random schema IDs and maintain a mapping from readable names to specific schemas (just like git associates branch names with commits).
+
+## Other related libraries
+
+- For a much more sophisticated approach to persistence which accounts for multiple concurrent readers/writers in a decentralized system, see [cambria-automerge](https://github.com/inkandswitch/cambria-automerge)
+- For a sketch of integrating cambria into a node express server for converting API request/response payloads, see [cambria-express](https://github.com/inkandswitch/cambria-express)
 
 ## Usage
 
