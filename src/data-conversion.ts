@@ -2,8 +2,7 @@
 
 import jsonpatch, { applyPatch } from 'fast-json-patch'
 import { createHash } from 'crypto'
-import { JSONSchema7 } from 'json-schema'
-import { updateSchema, compile, Patch, LensSource, CompiledLens, initLensGraph, LensGraph, registerLens, lensFromTo, applyLensToDoc, applyLensToPatch, lensGraphSchema } from 'cambria'
+import { Patch, LensSource, initLensGraph, LensGraph, registerLens, lensFromTo, applyLensToPatch, lensGraphSchema } from 'cambria'
 
 type SchemaId = string
 
@@ -14,7 +13,7 @@ interface TypedPatch {
   patch: Patch
 }
 
-export interface PatchLog {
+export interface RawDoc {
   patches: TypedPatch[]
 }
 
@@ -27,14 +26,14 @@ export class CambriaLocalStorage {
     this.headSchemas = {}
   }
 
-  initDoc<D>(pojo: D, schemaId: SchemaId): PatchLog {
+  initDoc<D>(pojo: D, schemaId: SchemaId): RawDoc {
     return { patches: [
       { schemaId, patch: jsonpatch.compare({}, pojo) }
     ] }
   }
 
   // read a doc as a given schema ID
-  readAs(doc: PatchLog, readerSchemaId: string): any {
+  readAs(doc: RawDoc, readerSchemaId: string): any {
     if (doc.patches === undefined) throw new Error('malformed Chitin doc')
 
     // Simply reduce over the list of patches to recover final state,
@@ -53,8 +52,7 @@ export class CambriaLocalStorage {
   }
 
   // Caller mutates a typed doc in a callback; changes get written out to all schemas in the doc.
-  changeTypedDoc(doc: PatchLog, writerSchemaId: SchemaId, callback: (any) => void) {
-
+  changeTypedDoc(doc: RawDoc, writerSchemaId: SchemaId, callback: (any) => void) {
     const typedDoc: Record<string, any> = this.readAs(doc, writerSchemaId)
 
     // set up a change watcher on the document
@@ -96,8 +94,11 @@ export class CambriaLocalStorage {
       .digest('hex')
 
     this.graph = registerLens(this.graph, headSchemaId, newSchemaId, lens)
-
     this.headSchemas[schemaName] = newSchemaId
     return newSchemaId
+  }
+
+  connectExistingSchemas(lens: LensSource, from: SchemaId, to: SchemaId) {
+    this.graph = registerLens(this.graph, from, to, lens)
   }
 }
