@@ -17,7 +17,7 @@ A tiny library that integrates with [cambria](https://github.com/inkandswitch/ca
 // Create an initial project schema, specifying its fields with a lens
 const store = new CambriaStore()
 store.initializeSchema('Project')
-const projectV1Schema = store.upgradeSchema([
+const projectV1Schema = store.upgradeSchemaByName([
   addProperty({ name: 'title', type: 'string' }),
   addProperty({ name: 'summary', type: 'string' }),
 ], 'Project')
@@ -30,7 +30,7 @@ const rawDoc = store.initDoc(
 
 // Upgrade the schema, renaming "summary" to "description",
 // and adding a new property called "complete"
-const projectV2Schema = store.upgradeSchema([
+const projectV2Schema = store.upgradeSchemaByName([
   renameProperty('summary', 'description'),
   addProperty({ name: 'complete', type: 'boolean' }),
 ], 'Project')
