@@ -55,10 +55,10 @@ const v2ToV3LensSource: LensSource = [
 
 describe('CambriaStore', () => {
   const store = new CambriaStore()
-  store.initializeSchema('Project')
-  const projectV1Schema = store.upgradeSchema(projectV1Lens, 'Project')
-  const projectV2Schema = store.upgradeSchema(v1Tov2LensSource, 'Project')
-  const projectV3Schema = store.upgradeSchema(v2ToV3LensSource, 'Project')
+  const projectV0Schema = store.initializeSchema('Project')
+  const projectV1Schema = store.upgradeSchemaByName(projectV1Lens, 'Project')
+  const projectV2Schema = store.upgradeSchemaByName(v1Tov2LensSource, 'Project')
+  const projectV3Schema = store.upgradeSchemaByName(v2ToV3LensSource, 'Project')
 
   // initialize a v1 doc
   const rawDoc: RawDoc = store.initDoc({ title: 'hello', summary: 'this works' }, projectV1Schema)
@@ -74,6 +74,7 @@ describe('CambriaStore', () => {
       assert.deepStrictEqual(store.readAs(rawDoc, projectV2Schema), {
         title: 'hello',
         description: 'this works',
+        complete: false
       })
     })
   
@@ -138,39 +139,38 @@ describe('CambriaStore', () => {
     it('can merge together data from divergent branches with an extra connecting lens', () => {
       const rawDoc = newDoc()
 
-      const branch1 = new CambriaStore()
-      const branch2 = new CambriaStore()
+      const store = new CambriaStore()
 
       // Each branch adds a new property and writes to the new property
-      branch1.initializeSchema('Project')
-      branch1.upgradeSchema(projectV1Lens, 'Project')
-      const branch1Schema = branch1.upgradeSchema(
+      store.initializeSchema('Project')
+      store.upgradeSchemaByName(projectV1Lens, 'Project')
+      const branch1Schema = store.upgradeSchemaByName(
         [addProperty({ name: 'branch1', type: 'string' })],
         'Project'
       )
-      branch1.changeTypedDoc(rawDoc, branch1Schema, (typedDoc) => {
+      store.changeTypedDoc(rawDoc, branch1Schema, (typedDoc) => {
         typedDoc.branch1 = 'branch1'
       })
 
-      branch2.initializeSchema('Project')
-      branch2.upgradeSchema(projectV1Lens, 'Project')
-      const branch2Schema = branch2.upgradeSchema(
+      store.initializeSchema('Project')
+      store.upgradeSchemaByName(projectV1Lens, 'Project')
+      const branch2Schema = store.upgradeSchemaByName(
         [addProperty({ name: 'branch2', type: 'string' })],
         'Project'
       )
-      branch2.changeTypedDoc(rawDoc, branch2Schema, (typedDoc) => {
+      store.changeTypedDoc(rawDoc, branch2Schema, (typedDoc) => {
         typedDoc.branch2 = 'branch2'
       })
 
       // Branch 1 "rebases", creating a single schema with both properties on it.
-      const combinedSchema = branch1.upgradeSchema(
+      const combinedSchema = store.upgradeSchemaById(
         [addProperty({ name: 'branch2', type: 'string' })],
-        'Project'
+        branch1Schema
       )
 
       // At this point, we can read the branch1 value, but the value from branch2 has been lost...
-      assert.strictEqual(branch1.readAs(rawDoc, combinedSchema).branch1, 'branch1')
-      assert.strictEqual(branch1.readAs(rawDoc, combinedSchema).branch2, '')
+      assert.strictEqual(store.readAs(rawDoc, combinedSchema).branch1, 'branch1')
+      assert.strictEqual(store.readAs(rawDoc, combinedSchema).branch2, '')
 
       // This makes sense since the shortest lens path from the original branch2 write to our
       // new combined schema goes through the shared parent v1, which doesn't have the new fields.
@@ -224,11 +224,11 @@ describe('CambriaStore', () => {
       // This bypasses all the schemaName + linear schema management logic, and simply
       // adds a lens between two existing schemas that can be used for conversions.
       // Todo: formalize this API more, clarify the external API surface of CambriaStore
-      branch1.connectExistingSchemas([], branch2Schema, combinedSchema)
+      store.connectExistingSchemas([], branch2Schema, combinedSchema)
 
       // Now let's try another read:
-      assert.strictEqual(branch1.readAs(rawDoc, combinedSchema).branch1, 'branch1')
-      assert.strictEqual(branch1.readAs(rawDoc, combinedSchema).branch2, 'branch2')
+      assert.strictEqual(store.readAs(rawDoc, combinedSchema).branch1, 'branch1')
+      assert.strictEqual(store.readAs(rawDoc, combinedSchema).branch2, 'branch2')
 
       // 🎉🎉 Tada! The branch2 data has been restored.
     })
@@ -239,8 +239,8 @@ describe('CambriaStore', () => {
 
       const store = new CambriaStore()
       store.initializeSchema('Project')
-      store.upgradeSchema(projectV1Lens, 'Project')
-      const finalSchemaId = store.upgradeSchema(addTagsLens, 'Project')
+      store.upgradeSchemaByName(projectV1Lens, 'Project')
+      const finalSchemaId = store.upgradeSchemaByName(addTagsLens, 'Project')
 
       const initialDoc = {
         title: 'hello',

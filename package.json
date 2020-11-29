@@ -6,7 +6,7 @@
   "author": "Geoffrey Litt",
   "license": "MIT",
   "dependencies": {
-    "cambria": "^0.1.2"
+    "cambria": "inkandswitch/cambria"
   },
   "scripts": {
     "test": "mocha -r ts-node/register test/**.ts"

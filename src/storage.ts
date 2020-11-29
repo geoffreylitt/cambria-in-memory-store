@@ -36,9 +36,17 @@ export class CambriaStore {
   readAs(doc: RawDoc, readerSchemaId: string): any {
     if (doc.patches === undefined) throw new Error('malformed Chitin doc')
 
+    // We prepend an empty patch to the beginning of the patch log;
+    // this fills in default values at the root level
+    const initPatch = {
+      schemaId: readerSchemaId,
+      patch: [ { op: 'add' as const, path: '', value: {} } ]
+    }
+    const patches = [initPatch, ...doc.patches]
+
     // Simply reduce over the list of patches to recover final state,
     // converting each patch from writer->reader schema as we go
-    const typedDoc = doc.patches.reduce((typedDoc, patch) => {
+    const typedDoc = patches.reduce((typedDoc, patch) => {
       const lens = lensFromTo(this.graph, patch.schemaId, readerSchemaId)
       const patchSchema = lensGraphSchema(this.graph, patch.schemaId)
       const convertedPatch = applyLensToPatch(lens, patch.patch, patchSchema)
@@ -75,26 +83,35 @@ export class CambriaStore {
     return schemaId
   }
 
-  // register a new lens and schema version within a schema
-  // returns the generated schema ID
-  upgradeSchema(lens: LensSource, schemaName: string): SchemaId {
+  // Given the name for a schema, upgrade it to a new version using a lens.
+  // Creates a new schema and updates the named pointer.
+  upgradeSchemaByName(lens: LensSource, schemaName: string): SchemaId {
     const headSchemaId = this.headSchemas[schemaName]
 
     if (!headSchemaId) {
       throw new Error(`Couldn't find schema ${schemaName}, did you create it with createSchema?`)
     }
 
+    const newSchemaId = this.upgradeSchemaById(lens, headSchemaId)
+    
+    this.headSchemas[schemaName] = newSchemaId
+    return newSchemaId
+  }
+
+  // Extend a schema, directly referencing it by ID.
+  // Don't update the named pointer.
+  upgradeSchemaById(lens: LensSource, schemaId: string): SchemaId {
     // new schema ID is a hash of the previous ID + this lens.
     // it's crucial to incorporate the previous schema ID here!
     // this means that the final schema ID depends on the full path of migrations
     const newSchemaId = createHash('md5')
-      .update(headSchemaId)
+      .update(schemaId)
       // todo: make this more deterministic; don't rely on key ordering
       .update(JSON.stringify(lens))
       .digest('hex')
+    
+    this.graph = registerLens(this.graph, schemaId, newSchemaId, lens)
 
-    this.graph = registerLens(this.graph, headSchemaId, newSchemaId, lens)
-    this.headSchemas[schemaName] = newSchemaId
     return newSchemaId
   }
 
