@@ -4,7 +4,7 @@
 
 import assert from 'assert'
 import { addProperty, renameProperty, convertValue, LensSource } from 'cambria'
-import { CambriaStore, RawDoc } from '../src/storage'
+import { CambriaStore, RawDoc } from '../src/index'
 
 export interface ProjectV1 {
   title: string
