@@ -28,15 +28,20 @@ const rawDoc = store.initDoc(
   projectV1Schema
 )
 
-// Upgrade the schema, renaming "summary" to "description".
-// In normal systems this would be a breaking change...but not here!
+// Upgrade the schema, renaming "summary" to "description",
+// and adding a new property called "complete"
 const projectV2Schema = store.upgradeSchema([
   renameProperty('summary', 'description'),
+  addProperty({ name: 'complete', type: 'boolean' }),
 ], 'Project')
 
-// We can immediately read the old document in our new schema...
+// We can immediately read the old document in our new schema:
 store.readAs(rawDoc, projectV2Schema)
-// => { title: 'hello', description: 'this works' }
+// => {
+//   title: 'hello',
+//   description: 'this works',  // old data, with new property name
+//   complete: false             // default value for new boolean property
+// }
 
 // But we can also still read it in the old schema! We never "migrated" the data.
 store.readAs(rawDoc, projectV1Schema)
